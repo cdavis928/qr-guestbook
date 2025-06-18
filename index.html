@@ -3,6 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
     <title>Location Guestbook</title>
     <style>
         * {
@@ -246,6 +249,13 @@
             position: relative;
         }
 
+        .typing-user {
+            font-size: 12px;
+            font-weight: 600;
+            margin-bottom: 5px;
+            color: #333;
+        }
+
         .typing-preview::before {
             content: '';
             position: absolute;
@@ -382,6 +392,16 @@
 
         // Generate a unique session ID for this user
         const sessionId = 'user_' + Math.random().toString(36).substr(2, 9) + '_' + Date.now();
+        
+        // Generate random emoji username for this session
+        const emojiOptions = ['🌟', '🌙', '🌸', '🌊', '🌿', '🦋', '🌈', '✨', '🍃', '🌺', '🌼', '🐝', '🌳', '🦜', '🍯', '🌞', '🌱', '🌀', '🔮', '🎭', '🎪', '🎨', '🎯', '🎲', '🎪', '🎠', '🎡', '🎢', '🚁', '🦄', '🦊', '🦝', '🐙', '🦋', '🌵', '🌴', '🍄', '🏔️', '⭐', '💫', '🌜'];
+        
+        function generateEmojiUsername() {
+            const shuffled = [...emojiOptions].sort(() => 0.5 - Math.random());
+            return shuffled.slice(0, 3).join('');
+        }
+        
+        const userEmoji = generateEmojiUsername();
 
         // Get location from URL parameter
         const urlParams = new URLSearchParams(window.location.search);
@@ -418,6 +438,10 @@
             currentDraft = this.value;
             updateTypingStatus(currentDraft);
         });
+
+        // Handle when user stops typing (for cleanup)
+        messageTextarea.addEventListener('blur', handleTypingStop);
+        messageTextarea.addEventListener('keyup', handleTypingStop);
 
         // Clean up typing status when user leaves
         window.addEventListener('beforeunload', deleteTypingStatus);
@@ -529,26 +553,30 @@
         // Live typing functionality
         let typingTimeout;
         let currentDraft = '';
+        let isTypingActive = false;
 
         async function updateTypingStatus(text) {
             try {
                 if (text.trim() === '') {
                     // Delete typing status if empty
                     await deleteTypingStatus();
+                    isTypingActive = false;
                     return;
                 }
+
+                isTypingActive = true;
 
                 // Use setDoc with the sessionId as document ID to update existing or create new
                 await setDoc(doc(db, 'typing', sessionId), {
                     sessionId: sessionId,
                     location: currentLocation,
                     text: text,
-                    timestamp: Date.now()
+                    timestamp: Date.now(),
+                    userEmoji: userEmoji
                 });
 
-                // Clear old timeout and set new one to clean up after 3 seconds of no typing
+                // Clear old timeout - don't auto-delete while actively typing
                 clearTimeout(typingTimeout);
-                typingTimeout = setTimeout(deleteTypingStatus, 3000);
 
             } catch (error) {
                 console.error('Error updating typing status:', error);
@@ -558,9 +586,22 @@
         async function deleteTypingStatus() {
             try {
                 await deleteDoc(doc(db, 'typing', sessionId));
+                isTypingActive = false;
             } catch (error) {
                 console.error('Error deleting typing status:', error);
             }
+        }
+
+        // Delete typing status when user stops interacting with textarea
+        function handleTypingStop() {
+            if (!isTypingActive) return;
+            
+            clearTimeout(typingTimeout);
+            typingTimeout = setTimeout(() => {
+                if (document.getElementById('messageText').value.trim() === '') {
+                    deleteTypingStatus();
+                }
+            }, 2000); // Only delete after 2 seconds of no typing if field is empty
         }
 
         // Listen for live typing updates
@@ -599,7 +640,7 @@
 
             const typingElements = typingData.map(typing => `
                 <div class="typing-preview">
-                    <div class="typing-location">${locationNames[typing.location] || typing.location}</div>
+                    <div class="typing-user">${typing.userEmoji || '👤👤👤'}</div>
                     "${escapeHtml(typing.text)}<span class="typing-cursor">|</span>"
                 </div>
             `).join('');
