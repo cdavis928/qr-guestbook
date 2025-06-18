@@ -384,10 +384,8 @@
                 
                 // Reload messages
                 await loadMessages();
-                
-                // Show success
-                alert('Message added! Thank you for sharing.');
             } else {
+                // Only show error alerts, not success
                 alert('Error saving message. Please try again.');
             }
             
