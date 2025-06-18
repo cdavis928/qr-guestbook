@@ -508,8 +508,18 @@
                     [`reactions.${reactionType}`]: increment(1)
                 });
                 
-                // Reload messages to show updated counts
-                await loadMessages();
+                // Just update the specific reaction count without reloading everything
+                const reactionButton = document.querySelector(`[onclick="addReaction('${messageId}', '${reactionType}')"] .reaction-count`);
+                if (reactionButton) {
+                    const currentCount = parseInt(reactionButton.textContent) || 0;
+                    reactionButton.textContent = currentCount + 1;
+                    
+                    // Add a little animation to show it worked
+                    reactionButton.parentElement.style.transform = 'scale(1.1)';
+                    setTimeout(() => {
+                        reactionButton.parentElement.style.transform = 'scale(1)';
+                    }, 150);
+                }
                 
             } catch (error) {
                 console.error('Error adding reaction:', error);
