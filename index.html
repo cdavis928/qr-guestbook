@@ -164,6 +164,47 @@
         .message-text {
             font-size: 16px;
             line-height: 1.5;
+            margin-bottom: 10px;
+        }
+
+        .reactions-bar {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            margin-top: 10px;
+            padding-top: 8px;
+            border-top: 1px solid #f0f0f0;
+        }
+
+        .reaction-btn {
+            background: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 15px;
+            padding: 4px 8px;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            gap: 3px;
+            min-width: 35px;
+            justify-content: center;
+        }
+
+        .reaction-btn:hover {
+            background: #e9ecef;
+            transform: translateY(-1px);
+        }
+
+        .reaction-btn.active {
+            background: #667eea;
+            color: white;
+            border-color: #667eea;
+        }
+
+        .reaction-count {
+            font-size: 11px;
+            font-weight: 500;
         }
 
         .empty-state {
@@ -239,7 +280,7 @@
     <script type="module">
         // Import Firebase functions
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.9.1/firebase-app.js";
-        import { getFirestore, collection, addDoc, query, orderBy, limit, getDocs, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.9.1/firebase-firestore.js";
+        import { getFirestore, collection, addDoc, query, orderBy, limit, getDocs, doc, updateDoc, increment, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.9.1/firebase-firestore.js";
 
         // Firebase configuration
         const firebaseConfig = {
@@ -309,7 +350,10 @@
                 const messages = [];
                 querySnapshot.forEach((doc) => {
                     const data = doc.data();
-                    messages.push(data);
+                    messages.push({
+                        id: doc.id,
+                        ...data
+                    });
                 });
                 
                 container.innerHTML = messages.map(message => `
@@ -319,6 +363,20 @@
                             <span>${formatTimeAgo(new Date(message.timestamp))}</span>
                         </div>
                         <div class="message-text">${escapeHtml(message.text)}</div>
+                        <div class="reactions-bar">
+                            <button class="reaction-btn" onclick="addReaction('${message.id}', 'lightning')" data-reaction="lightning">
+                                ⚡ <span class="reaction-count">${message.reactions?.lightning || 0}</span>
+                            </button>
+                            <button class="reaction-btn" onclick="addReaction('${message.id}', 'spiral')" data-reaction="spiral">
+                                🌀 <span class="reaction-count">${message.reactions?.spiral || 0}</span>
+                            </button>
+                            <button class="reaction-btn" onclick="addReaction('${message.id}', 'dog')" data-reaction="dog">
+                                🐕 <span class="reaction-count">${message.reactions?.dog || 0}</span>
+                            </button>
+                            <button class="reaction-btn" onclick="addReaction('${message.id}', 'eye')" data-reaction="eye">
+                                👁️ <span class="reaction-count">${message.reactions?.eye || 0}</span>
+                            </button>
+                        </div>
                     </div>
                 `).join('');
                 
@@ -334,12 +392,34 @@
                 await addDoc(collection(db, 'messages'), {
                     text: messageText,
                     location: location,
-                    timestamp: Date.now()
+                    timestamp: Date.now(),
+                    reactions: {
+                        lightning: 0,
+                        spiral: 0,
+                        dog: 0,
+                        eye: 0
+                    }
                 });
                 return true;
             } catch (error) {
                 console.error('Error saving message:', error);
                 return false;
+            }
+        }
+
+        // Add reaction to a message
+        window.addReaction = async function(messageId, reactionType) {
+            try {
+                const messageRef = doc(db, 'messages', messageId);
+                await updateDoc(messageRef, {
+                    [`reactions.${reactionType}`]: increment(1)
+                });
+                
+                // Reload messages to show updated counts
+                await loadMessages();
+                
+            } catch (error) {
+                console.error('Error adding reaction:', error);
             }
         }
         
