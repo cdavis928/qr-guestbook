@@ -207,6 +207,82 @@
             font-weight: 500;
         }
 
+        .live-typing-notice {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            border-radius: 6px;
+            padding: 10px;
+            margin-bottom: 15px;
+            font-size: 13px;
+            color: #856404;
+            text-align: center;
+        }
+
+        .live-typing-section {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 20px;
+            min-height: 60px;
+            border: 2px dashed #dee2e6;
+        }
+
+        .live-typing-header {
+            font-size: 14px;
+            font-weight: 600;
+            color: #666;
+            margin-bottom: 10px;
+            text-align: center;
+        }
+
+        .typing-preview {
+            background: white;
+            border: 1px solid #e9ecef;
+            border-radius: 6px;
+            padding: 10px;
+            margin-bottom: 10px;
+            font-style: italic;
+            color: #666;
+            position: relative;
+        }
+
+        .typing-preview::before {
+            content: '';
+            position: absolute;
+            left: -8px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 0;
+            height: 0;
+            border-top: 6px solid transparent;
+            border-bottom: 6px solid transparent;
+            border-right: 8px solid white;
+        }
+
+        .typing-location {
+            font-size: 11px;
+            color: #999;
+            font-weight: 500;
+        }
+
+        .typing-cursor {
+            animation: blink 1s infinite;
+            color: #667eea;
+            font-weight: bold;
+        }
+
+        @keyframes blink {
+            0%, 50% { opacity: 1; }
+            51%, 100% { opacity: 0; }
+        }
+
+        .no-typing {
+            text-align: center;
+            color: #999;
+            font-style: italic;
+            padding: 20px;
+        }
+
         .empty-state {
             text-align: center;
             padding: 40px 20px;
@@ -248,6 +324,9 @@
         
         <div class="content">
             <div class="message-form">
+                <div class="live-typing-notice">
+                    ⚠️ <strong>Live typing:</strong> Others can see what you're writing as you type
+                </div>
                 <form id="messageForm">
                     <div class="form-group">
                         <label for="messageText">Your message:</label>
@@ -268,6 +347,10 @@
                 </form>
             </div>
             
+            <div id="liveTypingSection" class="live-typing-section">
+                <!-- Live typing will appear here -->
+            </div>
+            
             <div class="messages-section">
                 <h2 class="section-title">Messages from all locations</h2>
                 <div id="messagesContainer">
@@ -280,7 +363,7 @@
     <script type="module">
         // Import Firebase functions
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.9.1/firebase-app.js";
-        import { getFirestore, collection, addDoc, query, orderBy, limit, getDocs, doc, updateDoc, increment, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.9.1/firebase-firestore.js";
+        import { getFirestore, collection, addDoc, query, orderBy, limit, getDocs, doc, updateDoc, increment, onSnapshot, deleteDoc, where } from "https://www.gstatic.com/firebasejs/11.9.1/firebase-firestore.js";
 
         // Firebase configuration
         const firebaseConfig = {
@@ -296,6 +379,9 @@
         // Initialize Firebase
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
+
+        // Generate a unique session ID for this user
+        const sessionId = 'user_' + Math.random().toString(36).substr(2, 9) + '_' + Date.now();
 
         // Get location from URL parameter
         const urlParams = new URLSearchParams(window.location.search);
@@ -314,7 +400,7 @@
         // Update location badge
         document.getElementById('locationBadge').textContent = locationNames[currentLocation] || `📍 ${currentLocation}`;
         
-        // Character counter
+        // Character counter and live typing
         const messageTextarea = document.getElementById('messageText');
         const charCount = document.getElementById('charCount');
         
@@ -327,7 +413,14 @@
             } else {
                 charCount.style.color = '#666';
             }
+
+            // Update live typing status
+            currentDraft = this.value;
+            updateTypingStatus(currentDraft);
         });
+
+        // Clean up typing status when user leaves
+        window.addEventListener('beforeunload', deleteTypingStatus);
         
         // Load messages from Firebase
         async function loadMessages() {
@@ -422,6 +515,96 @@
                 console.error('Error adding reaction:', error);
             }
         }
+
+        // Live typing functionality
+        let typingTimeout;
+        let currentDraft = '';
+
+        async function updateTypingStatus(text) {
+            try {
+                if (text.trim() === '') {
+                    // Delete typing status if empty
+                    await deleteTypingStatus();
+                    return;
+                }
+
+                await addDoc(collection(db, 'typing'), {
+                    sessionId: sessionId,
+                    location: currentLocation,
+                    text: text,
+                    timestamp: Date.now()
+                });
+
+                // Clear old timeout and set new one to clean up after 3 seconds of no typing
+                clearTimeout(typingTimeout);
+                typingTimeout = setTimeout(deleteTypingStatus, 3000);
+
+            } catch (error) {
+                console.error('Error updating typing status:', error);
+            }
+        }
+
+        async function deleteTypingStatus() {
+            try {
+                const q = query(
+                    collection(db, 'typing'),
+                    where('sessionId', '==', sessionId)
+                );
+                const snapshot = await getDocs(q);
+                snapshot.forEach(async (doc) => {
+                    await deleteDoc(doc.ref);
+                });
+            } catch (error) {
+                console.error('Error deleting typing status:', error);
+            }
+        }
+
+        // Listen for live typing updates
+        function listenForTyping() {
+            const q = query(
+                collection(db, 'typing'),
+                orderBy('timestamp', 'desc')
+            );
+
+            onSnapshot(q, (snapshot) => {
+                const typingData = [];
+                const now = Date.now();
+                
+                snapshot.forEach((doc) => {
+                    const data = doc.data();
+                    // Only show typing from last 5 seconds and not from current user
+                    if (now - data.timestamp < 5000 && data.sessionId !== sessionId) {
+                        typingData.push(data);
+                    }
+                });
+
+                displayTyping(typingData);
+            });
+        }
+
+        function displayTyping(typingData) {
+            const container = document.getElementById('liveTypingSection');
+            
+            if (typingData.length === 0) {
+                container.innerHTML = `
+                    <div class="live-typing-header">👁️ Live Typing</div>
+                    <div class="no-typing">Silence... for now</div>
+                `;
+                return;
+            }
+
+            const typingElements = typingData.map(typing => `
+                <div class="typing-preview">
+                    <div class="typing-location">${locationNames[typing.location] || typing.location}</div>
+                    "${escapeHtml(typing.text)}<span class="typing-cursor">|</span>"
+                </div>
+            `).join('');
+
+            container.innerHTML = `
+                <div class="live-typing-header">👁️ Live Typing (${typingData.length} ${typingData.length === 1 ? 'person' : 'people'})</div>
+                ${typingElements}
+            `;
+        }
         
         // Format time ago
         function formatTimeAgo(date) {
@@ -458,9 +641,11 @@
             const success = await saveMessage(messageText, currentLocation);
             
             if (success) {
-                // Clear form
+                // Clear form and typing status
                 document.getElementById('messageText').value = '';
                 charCount.textContent = '0';
+                currentDraft = '';
+                await deleteTypingStatus();
                 
                 // Reload messages
                 await loadMessages();
@@ -474,8 +659,9 @@
             submitBtn.textContent = 'Leave Message';
         });
         
-        // Initialize - load messages when page loads
+        // Initialize - load messages and start listening for typing
         loadMessages();
+        listenForTyping();
     </script>
     </script>
 </body>
