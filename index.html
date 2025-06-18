@@ -363,7 +363,7 @@
     <script type="module">
         // Import Firebase functions
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.9.1/firebase-app.js";
-        import { getFirestore, collection, addDoc, query, orderBy, limit, getDocs, doc, updateDoc, increment, onSnapshot, deleteDoc, where } from "https://www.gstatic.com/firebasejs/11.9.1/firebase-firestore.js";
+        import { getFirestore, collection, addDoc, query, orderBy, limit, getDocs, doc, updateDoc, increment, onSnapshot, deleteDoc, where, setDoc } from "https://www.gstatic.com/firebasejs/11.9.1/firebase-firestore.js";
 
         // Firebase configuration
         const firebaseConfig = {
@@ -538,7 +538,8 @@
                     return;
                 }
 
-                await addDoc(collection(db, 'typing'), {
+                // Use setDoc with the sessionId as document ID to update existing or create new
+                await setDoc(doc(db, 'typing', sessionId), {
                     sessionId: sessionId,
                     location: currentLocation,
                     text: text,
@@ -556,14 +557,7 @@
 
         async function deleteTypingStatus() {
             try {
-                const q = query(
-                    collection(db, 'typing'),
-                    where('sessionId', '==', sessionId)
-                );
-                const snapshot = await getDocs(q);
-                snapshot.forEach(async (doc) => {
-                    await deleteDoc(doc.ref);
-                });
+                await deleteDoc(doc(db, 'typing', sessionId));
             } catch (error) {
                 console.error('Error deleting typing status:', error);
             }
