@@ -236,7 +236,26 @@
         </div>
     </div>
 
-    <script>
+    <script type="module">
+        // Import Firebase functions
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.9.1/firebase-app.js";
+        import { getFirestore, collection, addDoc, query, orderBy, limit, getDocs, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.9.1/firebase-firestore.js";
+
+        // Firebase configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyBy76BY359tKZY2fKzECHr1dQg7IroIyDc",
+            authDomain: "qr-guestbook.firebaseapp.com",
+            projectId: "qr-guestbook",
+            storageBucket: "qr-guestbook.firebasestorage.app",
+            messagingSenderId: "160109236560",
+            appId: "1:160109236560:web:645a343200f6a40a8b5c55",
+            measurementId: "G-T0NB8WQXSV"
+        };
+
+        // Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+
         // Get location from URL parameter
         const urlParams = new URLSearchParams(window.location.search);
         const currentLocation = urlParams.get('loc') || 'unknown';
@@ -269,56 +288,59 @@
             }
         });
         
-        // Sample messages (in a real app, these would come from a database)
-        const sampleMessages = [
-            {
-                text: "Beautiful sunset tonight. Grateful for this peaceful moment.",
-                location: "overlook1",
-                timestamp: new Date(Date.now() - 3600000) // 1 hour ago
-            },
-            {
-                text: "Reading here always feels magical. Left a bookmark in the poetry section.",
-                location: "bookstore1",
-                timestamp: new Date(Date.now() - 7200000) // 2 hours ago
-            },
-            {
-                text: "The coffee here tastes like home. Thank you for the recommendation, stranger.",
-                location: "cafe1",
-                timestamp: new Date(Date.now() - 10800000) // 3 hours ago
-            },
-            {
-                text: "Watching the ducks with my daughter. She says hello to anyone who reads this!",
-                location: "park1",
-                timestamp: new Date(Date.now() - 21600000) // 6 hours ago
-            },
-            {
-                text: "First time here. This place has such good energy. I'll be back.",
-                location: "garden1",
-                timestamp: new Date(Date.now() - 86400000) // 1 day ago
-            }
-        ];
-        
-        // Display messages
-        function displayMessages() {
+        // Load messages from Firebase
+        async function loadMessages() {
             const container = document.getElementById('messagesContainer');
+            container.innerHTML = '<div class="loading">Loading messages...</div>';
             
-            if (sampleMessages.length === 0) {
-                container.innerHTML = '<div class="empty-state">No messages yet. Be the first to leave one!</div>';
-                return;
-            }
-            
-            // Sort by timestamp (newest first)
-            const sortedMessages = sampleMessages.sort((a, b) => b.timestamp - a.timestamp);
-            
-            container.innerHTML = sortedMessages.map(message => `
-                <div class="message">
-                    <div class="message-header">
-                        <span class="location-tag">${locationNames[message.location] || message.location}</span>
-                        <span>${formatTimeAgo(message.timestamp)}</span>
+            try {
+                const q = query(
+                    collection(db, 'messages'),
+                    orderBy('timestamp', 'desc'),
+                    limit(50)
+                );
+                const querySnapshot = await getDocs(q);
+                
+                if (querySnapshot.empty) {
+                    container.innerHTML = '<div class="empty-state">No messages yet. Be the first to leave one!</div>';
+                    return;
+                }
+                
+                const messages = [];
+                querySnapshot.forEach((doc) => {
+                    const data = doc.data();
+                    messages.push(data);
+                });
+                
+                container.innerHTML = messages.map(message => `
+                    <div class="message">
+                        <div class="message-header">
+                            <span class="location-tag">${locationNames[message.location] || message.location}</span>
+                            <span>${formatTimeAgo(new Date(message.timestamp))}</span>
+                        </div>
+                        <div class="message-text">${escapeHtml(message.text)}</div>
                     </div>
-                    <div class="message-text">${escapeHtml(message.text)}</div>
-                </div>
-            `).join('');
+                `).join('');
+                
+            } catch (error) {
+                console.error('Error loading messages:', error);
+                container.innerHTML = '<div class="empty-state">Error loading messages. Please try again.</div>';
+            }
+        }
+
+        // Save message to Firebase
+        async function saveMessage(messageText, location) {
+            try {
+                await addDoc(collection(db, 'messages'), {
+                    text: messageText,
+                    location: location,
+                    timestamp: Date.now()
+                });
+                return true;
+            } catch (error) {
+                console.error('Error saving message:', error);
+                return false;
+            }
         }
         
         // Format time ago
@@ -342,7 +364,7 @@
         }
         
         // Handle form submission
-        document.getElementById('messageForm').addEventListener('submit', function(e) {
+        document.getElementById('messageForm').addEventListener('submit', async function(e) {
             e.preventDefault();
             
             const messageText = document.getElementById('messageText').value.trim();
@@ -352,34 +374,31 @@
             submitBtn.disabled = true;
             submitBtn.textContent = 'Sending...';
             
-            // Simulate API call (in real app, this would send to your backend)
-            setTimeout(() => {
-                // Add the new message to the beginning of the array
-                sampleMessages.unshift({
-                    text: messageText,
-                    location: currentLocation,
-                    timestamp: new Date()
-                });
-                
+            // Save to Firebase
+            const success = await saveMessage(messageText, currentLocation);
+            
+            if (success) {
                 // Clear form
                 document.getElementById('messageText').value = '';
                 charCount.textContent = '0';
                 
-                // Refresh display
-                displayMessages();
+                // Reload messages
+                await loadMessages();
                 
-                // Reset button
-                submitBtn.disabled = false;
-                submitBtn.textContent = 'Leave Message';
-                
-                // Show success (you could make this fancier)
+                // Show success
                 alert('Message added! Thank you for sharing.');
-                
-            }, 1000);
+            } else {
+                alert('Error saving message. Please try again.');
+            }
+            
+            // Reset button
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Leave Message';
         });
         
-        // Initialize
-        displayMessages();
+        // Initialize - load messages when page loads
+        loadMessages();
+    </script>
     </script>
 </body>
 </html>
