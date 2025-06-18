@@ -481,17 +481,17 @@
                         </div>
                         <div class="message-text">${escapeHtml(message.text)}</div>
                         <div class="reactions-bar">
-                            <button class="reaction-btn" onclick="addReaction('${message.id}', 'lightning')" data-reaction="lightning">
-                                ⚡ <span class="reaction-count">${message.reactions?.lightning || 0}</span>
+                            <button class="reaction-btn" onclick="addReaction('${message.id}', 'tramway')" data-reaction="tramway">
+                                🚡 <span class="reaction-count">${message.reactions?.tramway || 0}</span>
                             </button>
-                            <button class="reaction-btn" onclick="addReaction('${message.id}', 'spiral')" data-reaction="spiral">
-                                🌀 <span class="reaction-count">${message.reactions?.spiral || 0}</span>
+                            <button class="reaction-btn" onclick="addReaction('${message.id}', 'water')" data-reaction="water">
+                                🚱 <span class="reaction-count">${message.reactions?.water || 0}</span>
                             </button>
-                            <button class="reaction-btn" onclick="addReaction('${message.id}', 'dog')" data-reaction="dog">
-                                🐕 <span class="reaction-count">${message.reactions?.dog || 0}</span>
+                            <button class="reaction-btn" onclick="addReaction('${message.id}', 'amphora')" data-reaction="amphora">
+                                🏺 <span class="reaction-count">${message.reactions?.amphora || 0}</span>
                             </button>
-                            <button class="reaction-btn" onclick="addReaction('${message.id}', 'eye')" data-reaction="eye">
-                                👁️ <span class="reaction-count">${message.reactions?.eye || 0}</span>
+                            <button class="reaction-btn" onclick="addReaction('${message.id}', 'pager')" data-reaction="pager">
+                                📟 <span class="reaction-count">${message.reactions?.pager || 0}</span>
                             </button>
                         </div>
                     </div>
@@ -511,10 +511,10 @@
                     location: location,
                     timestamp: Date.now(),
                     reactions: {
-                        lightning: 0,
-                        spiral: 0,
-                        dog: 0,
-                        eye: 0
+                        tramway: 0,
+                        water: 0,
+                        amphora: 0,
+                        pager: 0
                     }
                 });
                 return true;
